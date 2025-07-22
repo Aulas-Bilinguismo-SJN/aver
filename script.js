@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbwwbBwjmV0_JBapYD8sDUDvqlIZQh8OqhZ8aC6H0zcFAXt4pT1kDFyde4GJu0X4PfGr4A/exec';
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxRNGfdkC8aMOowMFIusKSmJauSNBDFb5i-AbUaIifpm7HPk1_rOpfi5A9xFjqx_OWDmg/exec';
 
 let registrosBaseA = [];
 let baseA_ID = null;
