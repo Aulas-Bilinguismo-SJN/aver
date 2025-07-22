@@ -1,187 +1,297 @@
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxRNGfdkC8aMOowMFIusKSmJauSNBDFb5i-AbUaIifpm7HPk1_rOpfi5A9xFjqx_OWDmg/exec';
-const BASE_A_ID = '1GU1oKIb9E0Vvwye6zRB2F_fT2jGzRvJ0WoLtWKuio-E';
 
-let baseA = [];
-const items = Array.from({length: 50}, (_, i) => ({
-    id: i + 1,
-    documento: "",
-    profesor: "",
-    materia: ""
-}));
+let registrosBaseA = [];
+const baseA_ID = '1GU1oKIb9E0Vvwye6zRB2F_fT2jGzRvJ0WoLtWKuio-E'; // ID fijo de la BaseA "Personas_Prestamo_Equipos"
 
-// Cargar BaseA al inicio
-async function init() {
+async function cargarBaseA() {
     try {
-        const res = await fetch(`${BACKEND_URL}?action=obtenerBaseA&id=${BASE_A_ID}`);
-        const data = await res.json();
-        if (data.success) {
-            baseA = data.data;
-            console.log("BaseA cargada");
+        const res = await fetch(`${BACKEND_URL}?action=obtenerBaseA&id=${baseA_ID}`);
+        const json = await res.json();
+        if (json.success) {
+            registrosBaseA = json.data;
+            console.log("BaseA 'Personas_Prestamo_Equipos' cargada correctamente.");
+            actualizarVista();
         } else {
-            alert("Error cargando base de datos");
+            console.error("No se pudo cargar BaseA: " + json.mensaje);
+            alert("Error al cargar la base de datos. Verifique su conexión.");
         }
-    } catch (e) {
-        alert("Error de conexión");
+    } catch (error) {
+        console.error("Error al cargar BaseA:", error);
+        alert("Error de red al intentar cargar la base de datos.");
     }
-    renderGrid();
 }
 
-// Buscar persona por documento
-const findByDoc = (doc) => baseA.find(r => String(r.Documento).trim() === doc.trim());
-
-// Registrar operación
-async function saveOperation(item, tipo, comentario = "") {
-    const persona = findByDoc(item.documento);
-    await fetch(BACKEND_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-            action: "registrarOperacion",
-            equipo: item.id,
-            documento: item.documento,
-            profesor: item.profesor,
-            materia: item.materia,
-            tipo,
-            nombre: persona?.["Nombre Completo"] || "",
-            curso: persona?.["Curso"] || "",
-            telefono: persona?.["Teléfono"] || "",
-            comentario
-        })
-    });
+function buscarPorDocumentoLocal(documento) {
+    return registrosBaseA.find(r => String(r["Documento"]).trim() === documento.trim());
 }
 
-// Mostrar modal
-function showModal(itemId) {
-    if (!baseA.length) return alert("Base de datos no cargada");
-    
-    const item = items[itemId - 1];
+// === Datos de los 50 items ===
+const items = [];
+for (let i = 1; i <= 50; i++) {
+    items.push({ id: `item_${i}`, nombre: `${i}`, documento: "", profesor: "", materia: "" });
+}
+
+function mostrarModalItem(itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (registrosBaseA.length === 0) {
+        alert("La base de datos aún no está cargada. Espere un momento e intente nuevamente.");
+        return;
+    }
+
+    if (item.documento.trim() !== "") {
+        mostrarModalDesmarcar(itemId);
+        return;
+    }
+
     const modal = document.getElementById('modalMetodos');
-    const content = document.getElementById('listaMetodos');
-    
-    if (item.documento) {
-        showReturnModal(item, modal, content);
-    } else {
-        showLoanModal(item, modal, content);
-    }
-    
+    const listaMetodos = document.getElementById('listaMetodos');
+    document.querySelector('.modal-header h2').textContent = `Equipo ${item.nombre}`;
+    document.querySelector('.modal-body p').textContent = 'Complete la información del Equipo:';
+    listaMetodos.innerHTML = '';
+
+    const formulario = document.createElement('div');
+    formulario.style.display = 'flex';
+    formulario.style.flexDirection = 'column';
+    formulario.style.gap = '15px';
+
+    const divDocumento = document.createElement('div');
+    divDocumento.innerHTML = `
+        <label for="documento">Documento:</label>
+        <textarea id="documento" rows="2" placeholder="Ingrese el documento...">${item.documento}</textarea>
+    `;
+
+    const divProfesor = document.createElement('div');
+    divProfesor.innerHTML = `
+        <label for="profesor">Profesor(a) Encargado:</label>
+        <input type="text" id="profesor" value="${item.profesor}">
+    `;
+
+    const divMateria = document.createElement('div');
+    divMateria.innerHTML = `
+        <label for="materia">Materia:</label>
+        <input type="text" id="materia" value="${item.materia || ''}">
+    `;
+
+    const divBotones = document.createElement('div');
+    divBotones.style.display = 'flex';
+    divBotones.style.gap = '10px';
+    divBotones.style.justifyContent = 'flex-end';
+
+    const btnGuardar = document.createElement('button');
+    btnGuardar.textContent = 'Guardar';
+    btnGuardar.style.backgroundColor = '#007bff';
+    btnGuardar.style.color = 'white';
+
+    const btnCancelar = document.createElement('button');
+    btnCancelar.textContent = 'Cancelar';
+    btnCancelar.style.backgroundColor = '#6c757d';
+    btnCancelar.style.color = 'white';
+
+    btnGuardar.addEventListener('click', async () => {
+        const documento = document.getElementById('documento').value.trim();
+        const profesor = document.getElementById('profesor').value.trim();
+        const materia = document.getElementById('materia').value.trim();
+
+        if (!documento) {
+            alert("Debe ingresar un documento.");
+            return;
+        }
+
+        const persona = buscarPorDocumentoLocal(documento);
+        if (!persona) {
+            alert("Documento no encontrado en BaseA.");
+            return;
+        }
+
+        item.documento = documento;
+        item.profesor = profesor;
+        item.materia = materia;
+
+        await fetch(BACKEND_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: "registrarOperacion",
+                equipo: item.nombre,
+                documento,
+                profesor,
+                materia,
+                tipo: "Préstamo",
+                nombre: persona["Nombre Completo"] || "",
+                curso: persona["Curso"] || "",
+                telefono: persona["Teléfono"] || "",
+                comentario: ""
+            })
+        });
+
+        cerrarModal();
+        actualizarVista();
+    });
+
+    btnCancelar.addEventListener('click', cerrarModal);
+
+    divBotones.appendChild(btnGuardar);
+    divBotones.appendChild(btnCancelar);
+
+    formulario.appendChild(divDocumento);
+    formulario.appendChild(divProfesor);
+    formulario.appendChild(divMateria);
+    formulario.appendChild(divBotones);
+
+    listaMetodos.appendChild(formulario);
     modal.style.display = 'block';
 }
 
-function showLoanModal(item, modal, content) {
-    content.innerHTML = `
-        <h2>Equipo ${item.id}</h2>
-        <div style="display:flex;flex-direction:column;gap:15px">
-            <div>
-                <label>Documento:</label>
-                <textarea id="doc" rows="2" placeholder="Ingrese documento"></textarea>
-            </div>
-            <div>
-                <label>Profesor:</label>
-                <input id="prof" placeholder="Nombre del profesor">
-            </div>
-            <div>
-                <label>Materia:</label>
-                <input id="mat" placeholder="Materia">
-            </div>
-            <div style="display:flex;gap:10px;justify-content:flex-end">
-                <button onclick="saveLoan(${item.id})" style="background:#007bff;color:white;padding:8px 16px;border:none;border-radius:4px">Guardar</button>
-                <button onclick="closeModal()" style="background:#6c757d;color:white;padding:8px 16px;border:none;border-radius:4px">Cancelar</button>
-            </div>
-        </div>
+function mostrarModalDesmarcar(itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const modal = document.getElementById('modalMetodos');
+    const listaMetodos = document.getElementById('listaMetodos');
+    document.querySelector('.modal-header h2').textContent = `Devolver Equipo ${item.nombre}`;
+    document.querySelector('.modal-body p').textContent = 'Información del equipo:';
+    listaMetodos.innerHTML = '';
+
+    const formulario = document.createElement('div');
+    formulario.style.display = 'flex';
+    formulario.style.flexDirection = 'column';
+    formulario.style.gap = '15px';
+
+    const info = document.createElement('div');
+    info.innerHTML = `
+        <p><strong>Documento:</strong> ${item.documento}</p>
+        <p><strong>Profesor:</strong> ${item.profesor}</p>
+        <p><strong>Materia:</strong> ${item.materia || '-'}</p>
     `;
-}
 
-function showReturnModal(item, modal, content) {
-    content.innerHTML = `
-        <h2>Devolver Equipo ${item.id}</h2>
-        <div style="display:flex;flex-direction:column;gap:15px">
-            <div>
-                <p><strong>Documento:</strong> ${item.documento}</p>
-                <p><strong>Profesor:</strong> ${item.profesor}</p>
-                <p><strong>Materia:</strong> ${item.materia || '-'}</p>
-            </div>
-            <div>
-                <label>Comentario:</label>
-                <textarea id="comment" rows="3" placeholder="Comentario opcional"></textarea>
-            </div>
-            <div style="display:flex;gap:10px;justify-content:flex-end">
-                <button onclick="saveReturn(${item.id})" style="background:#dc3545;color:white;padding:8px 16px;border:none;border-radius:4px">Devolver</button>
-                <button onclick="closeModal()" style="background:#6c757d;color:white;padding:8px 16px;border:none;border-radius:4px">Cancelar</button>
-            </div>
-        </div>
+    const divComentario = document.createElement('div');
+    divComentario.innerHTML = `
+        <label for="comentario">Comentario (opcional):</label>
+        <textarea id="comentario" rows="3" placeholder="Escriba un comentario si lo desea..."></textarea>
     `;
+
+    const divBotones = document.createElement('div');
+    divBotones.style.display = 'flex';
+    divBotones.style.gap = '10px';
+    divBotones.style.justifyContent = 'flex-end';
+
+    const btnDesmarcar = document.createElement('button');
+    btnDesmarcar.textContent = 'Devolver';
+    btnDesmarcar.style.backgroundColor = '#a94442';
+    btnDesmarcar.style.color = 'white';
+
+    const btnCancelar = document.createElement('button');
+    btnCancelar.textContent = 'Cancelar';
+    btnCancelar.style.backgroundColor = '#6c757d';
+    btnCancelar.style.color = 'white';
+
+    btnDesmarcar.addEventListener('click', async () => {
+        const comentario = document.getElementById('comentario').value.trim();
+        const persona = buscarPorDocumentoLocal(item.documento);
+
+        await fetch(BACKEND_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: "registrarOperacion",
+                equipo: item.nombre,
+                documento: item.documento,
+                profesor: item.profesor,
+                materia: item.materia || '',
+                tipo: "Devolución",
+                nombre: persona?.["Nombre Completo"] || "",
+                curso: persona?.["Curso"] || "",
+                telefono: persona?.["Teléfono"] || "",
+                comentario: comentario
+            })
+        });
+
+        item.documento = "";
+        item.profesor = "";
+        item.materia = "";
+
+        cerrarModal();
+        actualizarVista();
+    });
+
+    btnCancelar.addEventListener('click', cerrarModal);
+
+    divBotones.appendChild(btnDesmarcar);
+    divBotones.appendChild(btnCancelar);
+
+    formulario.appendChild(info);
+    formulario.appendChild(divComentario);
+    formulario.appendChild(divBotones);
+
+    listaMetodos.appendChild(formulario);
+    modal.style.display = 'block';
 }
 
-async function saveLoan(itemId) {
-    const doc = document.getElementById('doc').value.trim();
-    const prof = document.getElementById('prof').value.trim();
-    const mat = document.getElementById('mat').value.trim();
-    
-    if (!doc) return alert("Ingrese documento");
-    if (!findByDoc(doc)) return alert("Documento no encontrado");
-    
-    const item = items[itemId - 1];
-    item.documento = doc;
-    item.profesor = prof;
-    item.materia = mat;
-    
-    await saveOperation(item, "Préstamo");
-    closeModal();
-    renderGrid();
-}
-
-async function saveReturn(itemId) {
-    const comment = document.getElementById('comment').value.trim();
-    const item = items[itemId - 1];
-    
-    await saveOperation(item, "Devolución", comment);
-    
-    item.documento = "";
-    item.profesor = "";
-    item.materia = "";
-    
-    closeModal();
-    renderGrid();
-}
-
-function closeModal() {
+function cerrarModal() {
     document.getElementById('modalMetodos').style.display = 'none';
 }
 
-function renderGrid() {
-    const container = document.getElementById("malla") || document.getElementById("contenedorEquipos");
-    container.innerHTML = "";
-    container.style.cssText = "display:grid;grid-template-columns:repeat(10,1fr);gap:15px;padding:20px";
-    
+function actualizarVista() {
+    crearGrilla();
+}
+
+function crearGrilla() {
+    const contenedor = document.getElementById("malla") || document.getElementById("contenedorEquipos");
+    contenedor.innerHTML = "";
+    contenedor.style.display = "grid";
+    contenedor.style.gridTemplateColumns = "repeat(10, 1fr)";
+    contenedor.style.gap = "15px";
+    contenedor.style.padding = "20px";
+
     items.forEach(item => {
-        const occupied = !!item.documento;
         const div = document.createElement("div");
-        div.style.cssText = `
-            background:${occupied ? '#d4edda' : '#f8f9fa'};
-            border:2px solid ${occupied ? '#28a745' : '#ccc'};
-            display:flex;flex-direction:column;align-items:center;justify-content:center;
-            cursor:pointer;border-radius:8px;padding:15px;min-height:60px
-        `;
-        div.innerHTML = `
-            <div style="font-weight:bold;font-size:18px">${item.id}</div>
-            <div style="color:${occupied ? 'green' : '#6c757d'};font-size:24px">${occupied ? '✓' : '○'}</div>
-        `;
-        div.onclick = () => showModal(item.id);
-        container.appendChild(div);
+        div.className = "ramo";
+        div.style.backgroundColor = item.documento ? "#d4edda" : "#f8f9fa";
+        div.style.border = item.documento ? "2px solid #28a745" : "2px solid #ccc";
+        div.style.display = "flex";
+        div.style.flexDirection = "column";
+        div.style.alignItems = "center";
+        div.style.justifyContent = "center";
+        div.style.cursor = "pointer";
+        div.style.borderRadius = "8px";
+        div.style.padding = "10px";
+
+        const numero = document.createElement("div");
+        numero.textContent = item.nombre;
+        numero.style.fontWeight = "bold";
+
+        const estado = document.createElement("div");
+        estado.textContent = item.documento ? "✓" : "○";
+        estado.style.color = item.documento ? "green" : "#6c757d";
+
+        div.appendChild(numero);
+        div.appendChild(estado);
+        div.addEventListener("click", () => mostrarModalItem(item.id));
+        contenedor.appendChild(div);
     });
 }
 
 function resetearMalla() {
-    if (confirm("¿Resetear todos los equipos?")) {
+    if (confirm("¿Deseas resetear todos los Equipos?")) {
         items.forEach(item => {
             item.documento = "";
             item.profesor = "";
             item.materia = "";
         });
-        renderGrid();
+        actualizarVista();
     }
 }
 
-// Event listeners
-window.onclick = e => e.target.id === 'modalMetodos' && closeModal();
-document.addEventListener('keydown', e => e.key === 'Escape' && closeModal());
-document.addEventListener('DOMContentLoaded', init);
+window.onclick = function (event) {
+    const modal = document.getElementById('modalMetodos');
+    if (event.target === modal) cerrarModal();
+}
+
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') cerrarModal();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    crearGrilla();
+    cargarBaseA(); // Carga automáticamente la BaseA al iniciar
+});
