@@ -1,22 +1,25 @@
 const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxRNGfdkC8aMOowMFIusKSmJauSNBDFb5i-AbUaIifpm7HPk1_rOpfi5A9xFjqx_OWDmg/exec';
 
+// BaseA fija - "Personas_Prestamo_Equipos"
+const BASEA_FIXED_ID = '1GU1oKIb9E0Vvwye6zRB2F_fT2jGzRvJ0WoLtWKuio-E';
+
 let registrosBaseA = [];
-const baseA_ID = '1GU1oKIb9E0Vvwye6zRB2F_fT2jGzRvJ0WoLtWKuio-E'; // ID fijo de la BaseA
 
 async function cargarBaseA() {
     try {
-        const res = await fetch(`${BACKEND_URL}?action=obtenerBaseA&id=${baseA_ID}`);
+        const res = await fetch(`${BACKEND_URL}?action=obtenerBaseA&id=${BASEA_FIXED_ID}`);
         const json = await res.json();
         if (json.success) {
             registrosBaseA = json.data;
             console.log("BaseA 'Personas_Prestamo_Equipos' cargada correctamente.");
             actualizarVista();
         } else {
-            alert("No se pudo cargar BaseA 'Personas_Prestamo_Equipos': " + json.mensaje);
+            console.error("No se pudo cargar BaseA:", json.mensaje);
+            alert("Error al cargar la base de datos de personas. Por favor, recargue la página.");
         }
     } catch (error) {
         console.error("Error al cargar BaseA:", error);
-        alert("Error de red al intentar cargar BaseA 'Personas_Prestamo_Equipos'.");
+        alert("Error de red al intentar cargar la base de datos. Verifique su conexión e intente nuevamente.");
     }
 }
 
@@ -35,7 +38,7 @@ function mostrarModalItem(itemId) {
     if (!item) return;
 
     if (registrosBaseA.length === 0) {
-        alert("La BaseA 'Personas_Prestamo_Equipos' aún no se ha cargado. Intente nuevamente en unos segundos.");
+        alert("La base de datos de personas aún no se ha cargado completamente. Por favor, espere un momento e intente nuevamente.");
         return;
     }
 
@@ -100,7 +103,7 @@ function mostrarModalItem(itemId) {
 
         const persona = buscarPorDocumentoLocal(documento);
         if (!persona) {
-            alert("Documento no encontrado en BaseA 'Personas_Prestamo_Equipos'.");
+            alert("Documento no encontrado en la base de datos de personas.");
             return;
         }
 
@@ -292,5 +295,5 @@ document.addEventListener('keydown', function (event) {
 
 document.addEventListener('DOMContentLoaded', () => {
     crearGrilla();
-    cargarBaseA(); // Carga automáticamente la BaseA al cargar la página
+    cargarBaseA(); // Carga automática de la BaseA fija
 });
